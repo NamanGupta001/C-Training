@@ -1,54 +1,28 @@
+/***********************************************************************************************************************************************
+****************This header file will write pcap file stats,packet count info and packet transfer stats. into csv files*************************
+***********************************************************************************************************************************************/
+#ifndef WRITE_CSV_H
+#define WRITE_CSV_H
+
 #include<fstream>
-#include<iostream>
-#include<string>
+#include "pairIPds.h"
 
-using namespace std;
-
-struct writeToCsv
+class writeToCsv
 {   
-    ofstream countWriterObj;
-    void writeColumnNames(std::ofstream &csvObj,std::string pcapStatsCsv);
+    public:
+    std::ofstream writeToCsvObj;
+
+    //Writes pcap stats attribute names in csv file
+    void writeColumnNames(std::string pcapStatsCsv);
+    
+    //Writes values of pcap file stats
+    void writePacketStats(std::string pcapStatsArr[],unsigned short int arrSize);
+    
+    //Writes counts of tcp,udp,ipv4,ipv6 packets resp.
     void writePacketCounts(unsigned int packetCount[],unsigned short int arrSize,std::string filePath);
-   // void writeIPPairStats(PairIP obj,string targetPath);
+    
+    //Writes pair ip stats in csv file
+    void writeIPPairStats(PairIP pairIPObj,std::string targetPath);
 };
 
-void writeToCsv::writeColumnNames(std::ofstream &csvObj,std::string pcapStatsCsv)
-{   
-    csvObj.open(pcapStatsCsv);
-
-    if (csvObj)
-        csvObj<<"DestinationMacAddr,SourceMacAddr,SourceIPAddr,DestinationIPAddr,SourcePort,DestinationPort\n";
-    else
-    {
-        cout<<"Error opening content csv file\n";
-    }
-    
-}
-
-void writeToCsv::writePacketCounts(unsigned int packetCount[],unsigned short int arrSize,std::string filePath)
-{
-    
-    countWriterObj.open(filePath);
-    if (countWriterObj)
-    {   
-        countWriterObj<<"Total ipv4 addresses,Total ipv4 tcp packets count,Total ipv4 udp packet count \
-                        ,Total ipv6 addresses,Total ipv6 tcp packets count,Total ipv6 udp packet count\n";
-        
-        for (int index=0;index < arrSize;index++)
-        {
-            if (index != arrSize-1) countWriterObj<<packetCount[index]<<",";
-            else                    countWriterObj<<packetCount[index]<<"\n";            
-                
-        }
-    }    
-    else
-    {
-        cout<<"Error opening count csv file\n";
-    }
-    countWriterObj.close();
-}
-
-// void writeToCsv::writeIPPairStats(PairIP obj,string targetPath)
-// {
-//    // countWriterObj.open();
-// }
+#endif // !WRITE_CSV_H

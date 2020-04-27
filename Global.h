@@ -1,9 +1,9 @@
 
 struct global_header
 {
-    unsigned int         uint32_magic;
-    unsigned short int   uint16_version_major;
-    unsigned short int   uint16_version_minor;
+    unsigned int         magic_number;
+    unsigned short int   version_major;
+    unsigned short int   version_minor;
     
     // 8 bytes skipped in gmt and timezone accuracy
 

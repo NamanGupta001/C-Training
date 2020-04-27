@@ -1,4 +1,15 @@
-//# pragma once
+/************************************************************************************************************************************************
+*************Main driver file in which pcap file parsing for 64bit machine along with watch service is implemented******************************* 
+*************************************************************************************************************************************************/
+#include <sys/stat.h>                                                                                                                        
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <chrono>
 
 #include "watch.h"
 #include "Global.h"
@@ -7,249 +18,62 @@
 #include "ipUnion.h"
 #include "Tcp.h"
 #include "Udp.h"
-#include "Display.h"
+#include "display.h"
 #include "packetCount.h"
 #include "writeToCsv.h"
 #include "extractFiles.h"
-#include "fileHandling.h"
 #include "uniqueIPCount.h"
 #include "pairIPds.h"
 
-#include <iostream>
-#include <fstream>
-#include <vector>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <cstdio>
-#include <cstring>
-#include <unordered_map>
-#include <iterator>
-#include <string>
 
 using namespace std;
 
 class PcapParser
 {
-   const string PACKET_CONTENT_FOLDER_PATH = "/home/ubuntu/Downloads/content/";
-   const string PACKET_COUNT_FOLDER_PATH   = "/home/ubuntu/Downloads/count/";
-   const string IP_PAIR_STATS_FOLDER_PATH  = "/home/ubuntu/Downloads/ip pair stats/";
    
-   public:
-   
-   void pcapParser(string filePath);
-   string getFileName(string filePath);
-   static void* startWatch(void* filePath);
-   string getPacketContentFolderPath(); 
-   string getPacketCountFolderPath();
-   string getIPPairStatsFolderPath();
+  public:
+  
+  //Function parses pcap file by taking filepath as parameter 
+  void pcapParser(string filePath);
+  
+  //Returns filename from given filepath
+  string getFileName(string filePath);
+  
+  //getter functions
+  string getPacketContentFolderPath(); 
+  string getPacketCountFolderPath();
+  string getIPPairStatsFolderPath();
 
+  //Function to create folders for storing csv files
+  void createFolders();
+  
+  //Foler creation status
+  void folderStatus(int status);
+
+  //removes the csv's of pcap files who no longer exists
+  void removeFile(string fileName);
+  
+  //Removes extension of a file by taking filepath as parameter
+  string removeExtension(string path);
+
+  //Func. indicate when watch service will stop
+  bool getSignal();
+  
+  //Setting the signal variable value(setter) func.
+  void setSignal(bool keepRunning);
+
+  private:
+  
+  string PACKET_CONTENT_FOLDER_PATH = "/home/ubuntu/Downloads/content/";
+  string PACKET_COUNT_FOLDER_PATH   = "/home/ubuntu/Downloads/count/";
+  string IP_PAIR_STATS_FOLDER_PATH  = "/home/ubuntu/Downloads/ip pair stats/";
+  
+  //variable for starting/stopping watch service
+  bool signal=true;
 };
-string FileHandling::removeExtension(string filePath)
-{
-   const size_t period_idx = filePath.rfind('.');
-   if (std::string::npos != period_idx)
-   {
-    filePath.erase(period_idx);
-   }
-   
-   return filePath;
-}
 
-void FileHandling::removeFile(string pcapFileName)
-{
-  
-  PcapParser ob;
-  string fileName = removeExtension(pcapFileName);
-  string contentFilePath = ob.getPacketContentFolderPath() + fileName +".csv";
-  string countFilePath = ob.getPacketCountFolderPath() + fileName +".csv";                                  
-  
-  const char *fileContentPath = contentFilePath.c_str();
-  cout<<"file to be deleted path -"<<contentFilePath<<"\n";
-
-  int contentStatus = remove(fileContentPath); 
-  if (contentStatus == 0) cout<<"Content File deleted successfully\n";
-  else cout<<"Error deleting content file\n";
-  
-  const char *fileCountPath = countFilePath.c_str();
-
-  int countStatus = remove(fileCountPath);
-  if (countStatus == 0) cout<<"Count File deleted successfully\n";
-  else cout<<"Error deleting count file\n";
-}
-
-void DsUniqueIPAddr::displayUniqueIP()
-{
-   
-   cout<<"Displaying hashmap values\n";
-   cout<<"size of map\n"<<singleIPMap.size()<<"\n";
-   unordered_map<string,int>::iterator traverse;
-   traverse = singleIPMap.begin();
-   
-   for (traverse;traverse != singleIPMap.end();traverse++)
-   {
-      cout<<"IpAddress "<<traverse->first<<"\t\t\t\t\t\t";
-      cout<<"Count of IP "<<traverse->second<<"\n";
-      
-   }
-}
-
-void DsUniqueIPAddr::populateSingleIPMap(string sourceIP)
-{
-   unordered_map<string,int>::iterator traverseMap;
-   traverseMap=singleIPMap.find(sourceIP);
-   if (traverseMap != singleIPMap.end())
-   {
-      singleIPMap.at(sourceIP) += 1;
-   }
-   else
-   {
-      int count=1;
-      singleIPMap.insert(make_pair(sourceIP,count));
-   }
-   
-}
-
-string PcapParser::getPacketCountFolderPath()
-{
-  return PACKET_COUNT_FOLDER_PATH ;
-}
-
-string PcapParser::getPacketContentFolderPath()
-{
-  return PACKET_CONTENT_FOLDER_PATH ;
-}
-
-string PcapParser::getIPPairStatsFolderPath()
-{
-  return IP_PAIR_STATS_FOLDER_PATH;
-}
-
-void* PcapParser::startWatch(void* filePath)
-{
-   printf("Starting point:-%s\n","Mein aa gya");
-    char *path;
-    path=( char*) filePath;
-
-    char pathArr[50];
-    
-    snprintf(pathArr,50, "%s",path);  
-   
-    printf("Path is %s \n",path);
-    std::string watchDirPath = pathArr;
-    std::cout<<watchDirPath<<"\n";
-
-  int length, i = 0, wd;
-  int fd;
-  char buffer[BUF_LEN];
-  
-  /* Initialize Inotify*/
-  fd = inotify_init();
-  if ( fd < 0 ) {
-    perror( "Couldn't initialize inotify");
-  }
- 
-  /* add watch to starting directory */
-  wd = inotify_add_watch(fd, path, IN_CREATE | IN_MODIFY | IN_DELETE | IN_MOVED_FROM | IN_MOVED_TO); 
- 
-  if (wd == -1)
-    {
-      printf("Couldn't add watch to %s\n",path);
-    }
-  else
-    {
-      printf("Watching:: %s\n",path);
-    }
- 
-  /* do it forever*/
-  while(1)
-    {
-      i = 0;
-      length = read( fd, buffer, BUF_LEN );  
- 
-      if ( length < 0 ) {
-        perror( "read" );
-      }  
- 
-      while ( i < length ) {
-        struct inotify_event *event = ( struct inotify_event * ) &buffer[ i ];
-        std::string eventPath = watchDirPath  ;
-
-        if ( event->len ) {
-          if ( event->mask & IN_CREATE) {
-            if (event->mask & IN_ISDIR)
-              printf( "The directory %s was Created.\n", event->name );       
-            else
-              printf( "The file %s was Created with WD %d\n", event->name, event->wd );  
-              snprintf(pathArr,50,"%s",event->name);
-              eventPath +=  pathArr;
-              
-              std::cout<<"Inside create func.\n";
-              std::cout<<eventPath<<"\n";
-
-              //Sending file to parse 
-              PcapParser parserOb;
-              parserOb.pcapParser(eventPath);  
-                         
-
-          }
-           
-          if ( event->mask & IN_MODIFY) {
-            if (event->mask & IN_ISDIR)
-              printf( "The directory %s was modified.\n", event->name );       
-            else
-              printf( "The file %s was modified with WD %d\n", event->name, event->wd );       
-          }
-           
-          if ( event->mask & IN_DELETE) {
-            if (event->mask & IN_ISDIR)
-              printf( "The directory %s was deleted.\n", event->name );       
-            else
-              printf( "The file %s was deleted with WD %d\n", event->name, event->wd );
-              snprintf(pathArr,50,"%s",event->name);
-              eventPath += pathArr;
-              std::cout<<eventPath<<"\n";       
-          }  
- 
-          if (event->mask & IN_MOVED_FROM){
-            if (event->mask & IN_ISDIR)
-                ;//kuch karna hai
-            else
-                printf("The file %s is moved out of watch\n",event->name);
-          }    
-           if (event->mask & IN_MOVED_TO){
-            if (event->mask & IN_ISDIR)
-                ;//kuch karna hai
-            else
-                printf("The file is added to watch %s\n",event->name);
-          }     
-                
-          i += EVENT_SIZE + event->len;
-        }
-      }
-    }
- 
-  /* Clean up*/
-  inotify_rm_watch( fd, wd );
-  close( fd );
-}
- 
-string PcapParser::getFileName(string filePath)
-{
-   const size_t last_slash_idx = filePath.find_last_of("\\/");
-   if (std::string::npos != last_slash_idx)
-   {
-    filePath.erase(0, last_slash_idx + 1);
-   }
-
-   // Remove extension if present.
-   const size_t period_idx = filePath.rfind('.');
-   if (std::string::npos != period_idx)
-   {
-    filePath.erase(period_idx);
-   }
-
-   return filePath;
-}
 
 void PcapParser::pcapParser(string filePath)
 {  
@@ -261,63 +85,69 @@ void PcapParser::pcapParser(string filePath)
    const char                PROTOCOL_UDP    = 17;              //HEX VALUE IS 11
    long long int             readerPointer   = 24;              //Starts after global header is read
    
-   //Extracting filename from filepath
-   string fileName = getFileName(filePath);
-   
-   //Defining the path where csv's of count and stats of pcap file will be stored
-   string packetStatsFilePath = getPacketContentFolderPath()+ fileName + ".csv";  
-   string packetCountFilePath = getPacketCountFolderPath() + fileName + ".csv";
-   string ipPairStatsFilePath = getIPPairStatsFolderPath() + fileName + ".csv";
-
    //Defining the objects of headers
-   global_header   gh_obj;
-   ethernet_header eh_obj;
-   packet_header   ph_obj;
    ifstream        fread_obj;
-   ofstream        fwrite_obj;
-   IpAddress       ip_obj;
-   tcp_header      tcph_obj;
-   udp_header      udph_obj;
-   PacketCount     packetCnt_obj;
-   display         show_obj; 
-   writeToCsv      csvObj;
-   DsUniqueIPAddr  uniqueIPObj;
-   PairIP          pairIPObj;
-
+   global_header   gh_obj;
+   
    //Opening the file
    fread_obj.open(filePath,ios::binary);
 
    //Checking if file exists or not
    if (fread_obj)
-   {
+    {
       //Reading the global header
-      fread_obj.read((char*) &gh_obj.uint32_magic, 4);
+      fread_obj.read((char*) &gh_obj.magic_number, 4);
       fread_obj.seekg(16,ios::cur); 
       fread_obj.read((char*) &gh_obj.uint32_network,4);
 
    /*         GLOBAL HEADER ENDS HERE     */
     
     //Check for valid magic number
-    if (gh_obj.uint32_magic == MAGIC_NUMBER)
+    if (gh_obj.magic_number == MAGIC_NUMBER)
     {
     //Condition for checking ethernet packet
       if (gh_obj.uint32_network == 1)
       {
+        //Extracting filename from filepath
+        string fileName = getFileName(filePath);   
+   
+        //Defining the path where csv's of count and stats of pcap file will be stored
+        string packetStatsFilePath = getPacketContentFolderPath()+ fileName + ".csv";  
+        string packetCountFilePath = getPacketCountFolderPath() +  fileName + ".csv";
+        string ipPairStatsFilePath = getIPPairStatsFolderPath() +  fileName + ".csv";
+        
+        //Defining objects of header file included
+        ethernet_header eh_obj;
+        packet_header   ph_obj;
+        ofstream        fwrite_obj;
+        IpAddress       ip_obj;
+        tcp_header      tcph_obj;
+        udp_header      udph_obj;
+        PacketCount     packetCnt_obj;
+        display         show_obj; 
+        writeToCsv      csv_obj;
+        DsUniqueIPAddr  uniqueIP_obj;
+        PairIP          pairIP_obj;
+
+        //Creaing folders in which csv files will be stored
+        createFolders();
+        
         //Pointer to packet header structure
         struct packet_header *pktheader;
         pktheader=&ph_obj;
+
         //Writing Pcap file stats column names       
-        csvObj.writeColumnNames(fwrite_obj, packetStatsFilePath);
-        //int k=2;
+        csv_obj.writeColumnNames(packetStatsFilePath);
+        
         //Read file until packet header is readable
         while (fread_obj.read((char*)pktheader,16))        
-        {
+        { 
           //Boolean Variables
           bool isIpv6Packet=false;
           bool isIpv4Packet=false;
           bool isTcpPacket=false;
           bool isUdpPacket=false;
-          cout<<ph_obj.tsSec;exit(0);
+          
           string srcIpv4Addr="";
           string destnIpv4Addr="";
           string srcIpv6Addr="";
@@ -332,10 +162,10 @@ void PcapParser::pcapParser(string filePath)
           
           cout<<"Destination Mac Address\n";
           string destnMac=show_obj.displayMacAddr(eh_obj.ether_dhost);
-                   
+           cout<<'\n';        
           cout<<"Source mac Address\n";
           string sourceMac=show_obj.displayMacAddr(eh_obj.ether_shost);
-          
+          cout<<'\n';
           cout<<"Ethernet type\n";
           fread_obj.read((char*) &eh_obj.ether_type,2);         
           cout<<eh_obj.ether_type;
@@ -349,7 +179,7 @@ void PcapParser::pcapParser(string filePath)
               fread_obj.seekg(6,ios::cur);
               
               //Reading next header(protocol) field
-              fread_obj.read((char*) &ip_obj.ipv6obj.nextHeader ,1);
+              fread_obj.read((char*) &ip_obj.ipv6obj.next_header ,1);
               
               //Skipping Hop Limit field
               fread_obj.seekg(1,ios::cur);
@@ -367,7 +197,7 @@ void PcapParser::pcapParser(string filePath)
                   // IPV6 HEADER ENDS
 
               //Checking for TCP and UDP packets
-              if (ip_obj.ipv6obj.nextHeader == PROTOCOL_TCP)
+              if (ip_obj.ipv6obj.next_header == PROTOCOL_TCP)
               {
                 //if TCP packet (size = 20 bytes)
                 isTcpPacket = true;
@@ -379,7 +209,7 @@ void PcapParser::pcapParser(string filePath)
                 
                 // IPV6 TCP Packet ends here
               }
-              else if (ip_obj.ipv6obj.nextHeader == PROTOCOL_UDP)
+              else if (ip_obj.ipv6obj.next_header == PROTOCOL_UDP)
               {
                 //if UDP packet (size = 8 bytes)
                 isUdpPacket = true;
@@ -490,10 +320,10 @@ void PcapParser::pcapParser(string filePath)
           if (isIpv6Packet)
           {   
               //populating map of unique ip address and its packet count 
-              uniqueIPObj.populateSingleIPMap(srcIpv6Addr);
+              uniqueIP_obj.populateSingleIPMap(srcIpv6Addr);
               
               //populating pair ip map with packet transer attributes
-              pairIPObj.populatePairMap(srcIpv6Addr,destnIpv6Addr,ph_obj.tsSec);
+              pairIP_obj.populatePairMap(srcIpv6Addr,destnIpv6Addr,ph_obj.tsuSec);
 
               //Updating the count of ipv6 packet
               packetCnt_obj.ipv6AddrCount += 1;
@@ -504,8 +334,10 @@ void PcapParser::pcapParser(string filePath)
                 packetCnt_obj.ipv6TcpCount +=1 ;
                 
                 //Writing stats of pcap into csv file
-                fwrite_obj<<destnMac<<","<<sourceMac<<","<<srcIpv6Addr<<","<<destnIpv6Addr<<","
-                <<ntohs(tcph_obj.tcpSrcPort)<<","<<ntohs(tcph_obj.tcpDestnPort)<<"\n";
+                string pcapStats[6]= {destnMac,sourceMac,srcIpv6Addr,destnIpv6Addr,to_string(ntohs(tcph_obj.tcpSrcPort))
+                                    ,to_string(ntohs(tcph_obj.tcpDestnPort))};
+                csv_obj.writePacketStats(pcapStats,6);          
+                
               }
               else if (isUdpPacket)
               {
@@ -513,18 +345,20 @@ void PcapParser::pcapParser(string filePath)
                 packetCnt_obj.ipv6UdpCount += 1;
                 
                 //Writing stats of pcap into csv file
-                fwrite_obj<<destnMac<<","<<sourceMac<<","<<srcIpv4Addr<<","<<destnIpv4Addr<<","
-                <<ntohs(udph_obj.srcPort)<<","<<ntohs(udph_obj.destnPort)<<"\n";
+                string pcapStats[6]= {destnMac,sourceMac,srcIpv6Addr,destnIpv6Addr,to_string(ntohs(udph_obj.srcPort))
+                                    ,to_string(ntohs(udph_obj.destnPort))};
+                csv_obj.writePacketStats(pcapStats,6);
+                
               }
               
           }
           else if(isIpv4Packet)
           {   
               //populating map of unique ip address and its packet count
-              uniqueIPObj.populateSingleIPMap(srcIpv4Addr);
+              uniqueIP_obj.populateSingleIPMap(srcIpv4Addr);
               
               //populating pair ip map with packet transer attributes
-              pairIPObj.populatePairMap(srcIpv4Addr,destnIpv4Addr,ph_obj.tsSec);
+              pairIP_obj.populatePairMap(srcIpv4Addr,destnIpv4Addr,ph_obj.tsSec);
 
               //Updating the count of ipv4 packet
               packetCnt_obj.ipv4AddrCount += 1;
@@ -536,8 +370,10 @@ void PcapParser::pcapParser(string filePath)
                 
                 //Writing stats of pcap into csv file
                 
-                fwrite_obj<<destnMac<<","<<sourceMac<<","<<srcIpv4Addr<<","<<destnIpv4Addr<<","
-                <<ntohs(tcph_obj.tcpSrcPort)<<","<<ntohs(tcph_obj.tcpDestnPort)<<"\n";
+                string pcapStats[6]= {destnMac,sourceMac,srcIpv4Addr,destnIpv4Addr,to_string(ntohs(tcph_obj.tcpSrcPort))
+                                    ,to_string(ntohs(tcph_obj.tcpDestnPort))};
+                csv_obj.writePacketStats(pcapStats,6); 
+                
               }
               else if (isUdpPacket)
               {
@@ -545,8 +381,10 @@ void PcapParser::pcapParser(string filePath)
                 packetCnt_obj.ipv4UdpCount += 1;
                 
                 //Writing stats of pcap into csv file
-                fwrite_obj<<destnMac<<","<<sourceMac<<","<<srcIpv4Addr<<","<<destnIpv4Addr<<","
-                <<ntohs(udph_obj.srcPort)<<","<<ntohs(udph_obj.destnPort)<<"\n";
+                string pcapStats[6]= {destnMac,sourceMac,srcIpv4Addr,destnIpv4Addr,to_string(ntohs(udph_obj.srcPort))
+                                    ,to_string(ntohs(udph_obj.destnPort))};
+                csv_obj.writePacketStats(pcapStats,6);
+                
               }
               else{}
           }
@@ -556,44 +394,47 @@ void PcapParser::pcapParser(string filePath)
           readerPointer += ph_obj.cap_len + 16;
           
           fread_obj.seekg(readerPointer,ios::beg);
-          // k--;
+          
           cout<<"packet ended\n";         
-    }
+        }
     
-    //Displaying unique ips with their count
-    uniqueIPObj.displayUniqueIP();
+  //Displaying unique ips with their count
+  uniqueIP_obj.displayUniqueIP();
     
-    //Displaying pair ip's with packet transer stats
-    pairIPObj.displayPairMap();
+  //Displaying pair ip's with packet transer stats
+  // pairIP_obj.displayPairMap();
     
-    //Call to func. to write in packet transfer stats in csv file
-   // csvObj.writeIPPairStats(pairIPObj,ipPairStatsFilePath);
+  //This func. writes pair ip stats in csv file
+  csv_obj.writeIPPairStats(pairIP_obj,ipPairStatsFilePath);
+
+  //Populating packet count stats in array 
+  unsigned int packetCount[6]={packetCnt_obj.ipv4AddrCount,packetCnt_obj.ipv4TcpCount,
+                              packetCnt_obj.ipv4UdpCount,packetCnt_obj.ipv6AddrCount,
+                              packetCnt_obj.ipv6TcpCount,packetCnt_obj.ipv6UdpCount
+                              };
+  unsigned short int arrSize=6; 
+
+  //This func. writes packet count stats into csv file
+  csv_obj.writePacketCounts(packetCount,arrSize,packetCountFilePath);
+
+  cout<<"Total ipv4 addresses\n";
+  cout<<packetCnt_obj.ipv4AddrCount<<"\n";
+  cout<<"Total tcp packets count\n";
+  cout<<packetCnt_obj.ipv4TcpCount<<"\n";
+  cout<<"Total udp packet count\n";
+  cout<<packetCnt_obj.ipv4UdpCount<<"\n";
+
+  cout<<"Total ipv6 addresses\n";
+  cout<<packetCnt_obj.ipv6AddrCount<<"\n";
+  cout<<"Total tcp packets count\n";
+  cout<<packetCnt_obj.ipv6TcpCount<<"\n";
+  cout<<"Total udp packet count\n";
+  cout<<packetCnt_obj.ipv6UdpCount<<"\n";
+
+  fwrite_obj.close();
+  fread_obj.close();
 }
 else{}
-
-cout<<"Total ipv4 addresses\n";
-cout<<packetCnt_obj.ipv4AddrCount<<"\n";
-cout<<"Total tcp packets count\n";
-cout<<packetCnt_obj.ipv4TcpCount<<"\n";
-cout<<"Total udp packet count\n";
-cout<<packetCnt_obj.ipv4UdpCount<<"\n";
-
-cout<<"Total ipv6 addresses\n";
-cout<<packetCnt_obj.ipv6AddrCount<<"\n";
-cout<<"Total tcp packets count\n";
-cout<<packetCnt_obj.ipv6TcpCount<<"\n";
-cout<<"Total udp packet count\n";
-cout<<packetCnt_obj.ipv6UdpCount<<"\n";
-
-unsigned int packetCount[6]={packetCnt_obj.ipv4AddrCount,packetCnt_obj.ipv4TcpCount,
-                             packetCnt_obj.ipv4UdpCount,packetCnt_obj.ipv6AddrCount,
-                             packetCnt_obj.ipv6TcpCount,packetCnt_obj.ipv6UdpCount
-                            };
-unsigned short int arrSize=6;                            
-csvObj.writePacketCounts(packetCount,arrSize,packetCountFilePath);
-
-fwrite_obj.close();
-fread_obj.close();
 }
 else
 {
@@ -605,24 +446,105 @@ else{
   }
 }
 
+inline string PcapParser::getFileName(string filePath)
+{
+   const size_t last_slash_idx = filePath.find_last_of("\\/");
+   if (std::string::npos != last_slash_idx)
+   {
+    filePath.erase(0, last_slash_idx + 1);
+   }
+
+   // Remove extension if present.
+   const size_t period_idx = filePath.rfind('.');
+   if (std::string::npos != period_idx)
+   {
+    filePath.erase(period_idx);
+   }
+
+   return filePath;
+}
+
+inline string PcapParser::getPacketContentFolderPath()
+{
+  return PACKET_CONTENT_FOLDER_PATH ;
+}
+
+inline string PcapParser::getPacketCountFolderPath()
+{
+  return PACKET_COUNT_FOLDER_PATH ;
+}
+
+inline string PcapParser::getIPPairStatsFolderPath()
+{
+  return IP_PAIR_STATS_FOLDER_PATH;
+}
+
+void PcapParser::createFolders()
+{
+  
+  int contentStatus = mkdir(getPacketContentFolderPath().c_str(),S_IRWXU | S_IRWXG | S_IRWXO);
+  int countStatus   = mkdir(getPacketCountFolderPath().c_str()  ,S_IRWXU | S_IRWXG | S_IRWXO);
+  int pairIPStatus  = mkdir(getIPPairStatsFolderPath().c_str()  ,S_IRWXU | S_IRWXG | S_IRWXO);
+
+  //Checking mkdir function status for all folders
+  folderStatus(contentStatus);
+  folderStatus(countStatus);
+  folderStatus(pairIPStatus);
+    
+ 
+}
+
+void PcapParser::folderStatus(int status)
+{
+      if (status == 0)            cout<<"folder successfully created\n";
+      else if (errno == EEXIST)   cout<<"folder exists\n";
+      else                        cout<<"folder couln't be created ,with error no. -"<<errno;
+}
+
+void PcapParser::removeFile(string pcapFileName)
+{
+ 
+  string fileName  = removeExtension(pcapFileName);
+ 
+  //Converting string into const char* as to be compatible with remove func. parameter
+  string contentFilePath = getPacketContentFolderPath() + fileName + ".csv";
+  string countFilePath   = getPacketCountFolderPath()   + fileName + ".csv";                                  
+  string ipPairFilePath  = getIPPairStatsFolderPath()   + fileName + ".csv";
+
+  cout<<"file to be deleted path -"<<contentFilePath<<"\n";
+  
+  int contentStatus = remove(contentFilePath.c_str()); 
+  if (contentStatus == 0) cout<<"Content File deleted successfully\n";
+  else                    cout<<"Error deleting content file\n";
+
+  int countStatus = remove(countFilePath.c_str());
+  if (countStatus == 0) cout<<"Count File deleted successfully\n";
+  else                  cout<<"Error deleting count file\n";
+
+  int ipPairStatus = remove(ipPairFilePath.c_str());
+  if (countStatus == 0) cout<<"IP pair File deleted successfully\n";
+  else                  cout<<"Error deleting ip pair file\n";
+}
+
+string PcapParser::removeExtension(string filePath)
+{
+   cout<<"inside remove extension\n"<<filePath<<'\n';
+  const size_t lastPeriodIndex = filePath.rfind('.');
+   if (std::string::npos != lastPeriodIndex)
+   {
+    filePath.erase(lastPeriodIndex);
+   }
+  return filePath;
+  
+}
 
 void* watchtest(void* dirPath)
 {
-   printf("Starting point:-%s\n","Mein aa gya");
-    char *path;
-    path=( char*) dirPath;
+  char *path = 0;
+  path=( char*) dirPath;
+  printf("Path is %s \n",path);
 
-    char pathArr[50];
-    PcapParser parserOb;
-    FileExtractor extractorOb;
-    FileHandling fHandleOb;
-    snprintf(pathArr,50, "%s",path);  
-   
-    printf("Path is %s \n",path);
-    std::string watchDirPath = pathArr;
-    std::cout<<watchDirPath<<"\n";
-
-  int length, i = 0, wd;
+  int length, loopindex = 0, wd;
   int fd;
   char buffer[BUF_LEN];
   
@@ -643,37 +565,48 @@ void* watchtest(void* dirPath)
     {
       printf("Watching:: %s\n",path);
     }
- 
+
+  PcapParser parserOb;
+  FileExtractor extractorOb;
+
+
+  
   /* do it forever*/
-  while(1)
-    {
-      i = 0;
+  while(parserOb.getSignal())
+    { 
+      std::string eventPath ="";
+      std::string eventName ="";
+      loopindex = 0;
       length = read( fd, buffer, BUF_LEN );  
  
-      if ( length < 0 ) {
+      if ( length < 0 ) 
+      {
         perror( "read" );
       }  
- 
-      while ( i < length ) {
-        struct inotify_event *event = ( struct inotify_event * ) &buffer[ i ];
-        std::string eventPath = watchDirPath  ;
+      
+      eventPath = path ;
+      
+      while ( loopindex < length ) 
+      {
+        struct inotify_event *event = ( struct inotify_event * ) &buffer[ loopindex ];
 
-        if ( event->len ) {
-          
-          if ( event->mask & IN_CREATE) {
+        if ( event->len ) 
+        {         
+          if ( event->mask & IN_CREATE) 
+          {
             if (event->mask & IN_ISDIR)
               printf( "The directory %s was Created.\n", event->name );       
             else
               printf( "The file %s was Created with WD %d\n", event->name, event->wd );  
-              snprintf(pathArr,50,"%s",event->name);
-              eventPath +=  pathArr;
               
-              std::cout<<"Inside create func.\n";
+              //Path of file created
+              eventPath +=  event->name;
+              
               std::cout<<eventPath<<"\n";
-              
+              eventName = event->name;
               //Sending file to parse 
               
-              bool isPcapFile = extractorOb.hasEnding(event->name,".pcap");
+              bool isPcapFile = extractorOb.hasEnding(eventName,".pcap");
               
               if (isPcapFile)
                parserOb.pcapParser(eventPath);  
@@ -681,7 +614,8 @@ void* watchtest(void* dirPath)
 
           }
            
-          if ( event->mask & IN_MODIFY) {
+          if ( event->mask & IN_MODIFY) 
+          {
             if (event->mask & IN_ISDIR)
               printf( "The directory %s was modified.\n", event->name );       
             else
@@ -689,92 +623,157 @@ void* watchtest(void* dirPath)
 
           }
            
-          if ( event->mask & IN_DELETE) {
+          if ( event->mask & IN_DELETE) 
+          {
             if (event->mask & IN_ISDIR)
               printf( "The directory %s was deleted.\n", event->name );       
             else
               printf( "The file %s was deleted with WD %d\n", event->name, event->wd );
-              snprintf(pathArr,50,"%s",event->name);
-              eventPath += pathArr;
+              
+              eventPath += event->name;
               std::cout<<eventPath<<"\n";
+              eventName = event->name;
+
+              bool isPcapFile = extractorOb.hasEnding(eventName,".pcap");
+              bool isFileExists = extractorOb.isExists(eventPath);
               
-              bool isPcapFile = extractorOb.hasEnding(event->name,".pcap");
-              
-              if (isPcapFile)
-               fHandleOb.removeFile(pathArr);  
+              //Remove only when file is pcap and its csv file exists
+              if (isPcapFile && isFileExists)
+                parserOb.removeFile(eventName);  
               else ;
-              
-
-
+           
           }  
  
-          if (event->mask & IN_MOVED_FROM){
+          if (event->mask & IN_MOVED_FROM)
+          {
             if (event->mask & IN_ISDIR)
-                ;//kuch karna hai
+                ;
             else
                 printf("The file %s is moved out of watch\n",event->name);
-                 bool isPcapFile = extractorOb.hasEnding(event->name,".pcap");
-              
-               if (isPcapFile)
-                fHandleOb.removeFile(pathArr);  
-               else ;
+                eventName = event->name;
+                bool isPcapFile   = extractorOb.hasEnding(eventName,".pcap");
+                bool isFileExists = extractorOb.isExists(eventPath);
+                cout<<"in watcher func.(in moved from)"<<eventName<<'\n';
+                if (isPcapFile && isFileExists)
+                  parserOb.removeFile(eventName);  
+                else ;
           }    
-           if (event->mask & IN_MOVED_TO){
+           if (event->mask & IN_MOVED_TO)
+           {
             if (event->mask & IN_ISDIR)
-                ;//kuch karna hai
+                ;
             else
                 printf("The file %s is added to watch\n",event->name);
-                bool isPcapFile = extractorOb.hasEnding(event->name,".pcap");
-              
-               if (isPcapFile){
+                eventName = event->name;
+                bool isPcapFile = extractorOb.hasEnding(eventName,".pcap");
+
+               //Parse only when it's a pcap file
+               if (isPcapFile)
+               {
                 eventPath += event->name;
                 parserOb.pcapParser(eventPath);  
-               }else ;
+               }
+               else ;
           }     
                 
-          i += EVENT_SIZE + event->len;
+          loopindex += EVENT_SIZE + event->len;
         }
       }
+    
     }
-
+  
   /* Clean up*/
   inotify_rm_watch( fd, wd );
   close( fd );
+  pthread_exit(NULL);
+}
+
+bool PcapParser::getSignal()
+{
+  return signal;
+}
+
+void PcapParser::setSignal(bool keepRunning)
+{
+  signal = keepRunning;
 }
 
 int main()
 {  
-  PcapParser parserObj;
-  pthread_t watcher;
-    //directory to get pcap files
-   const char *watchDir="/home/ubuntu/Downloads/";
-   //watch directory
-
-   int id=pthread_create(&watcher,NULL,watchtest,(void *)watchDir);
-
-   if (id == 0) cout<<"Thread creation successful\n";
-   else cout<<"Error,couldnt create thread\n";
   
- // parserObj.createThread();
+  //directory to get pcap files
+  string pcapDir ="";
 
-  string pcapDir="/home/ubuntu/shared/C++ Training/"; 
-  cout<<"Extracting pcap files from directory\n";
+  //where folders containing csv files will be created
+  string invalidInput="/home/ubuntu/Downloads/";
   FileExtractor fileExtractorObj;
-  vector<string> pcapFiles;
+  
+  //program will continue only after valid dir is entered
+  while(true)
+  {
+    cout<<"Enter directory(with trailing slash) to get its pcap files parsed\n";
+    getline(cin,pcapDir);
+    
+    //Checks for a valid directory
+    bool isValidDir = fileExtractorObj.isDir(pcapDir);
+    if (isValidDir)   
+    {
+      if (! pcapDir.compare(invalidInput))
+        cout<<"You can't use this dir..please enter another one\n";
+      else  
+        break;
+    }
+    
+    else  cout<<"Invalid dir.Try again\n";
+  }
+  auto start = chrono::high_resolution_clock::now();
+  
+  //Declaring thread instance
+  pthread_t watcher;
+  
+  //watch servide dir path
+  const char *watchDir = pcapDir.c_str();
+  
+  //Thread creation for starting watch service
+  int id=pthread_create(&watcher,NULL,watchtest,(void *)watchDir);
+  
+  if (id == 0) cout<<"Thread creation successful\n";
+  else         cout<<"Error,couldn't create thread\n";
 
-  vector<string> filePathsContainer = fileExtractorObj.listFiles(pcapDir,true,pcapFiles);
+  //string pcapDir="/home/ubuntu/shared/C++ Training/"; 
+  cout<<"Extracting pcap files from directory\n";
+  
+  //Vector will be populated with pcap file paths
+  vector<string> pcapFiles{""};
+  
+  /*function call returns a vector containing filepath of pcap files present at that location,
+    second parameter indicates whether to search in sub-directories or not */
+
+  vector<string> filePathsContainer{""}; 
+  filePathsContainer= fileExtractorObj.listFiles(pcapDir,true,pcapFiles);
+  PcapParser parserObj;
   
   //Parsing pcap files one by one
   for (int index=0;index < filePathsContainer.size();index++)
   { 
     parserObj.pcapParser(filePathsContainer[index]);
-   //  cout<<"Pcap file name\n";
-   // cout<<filePathsContainer[index]<<endl;
      
   }
-
-   cout<<"press q to terminate program\n";
-   char choice;
-   cin>>choice;
-   if (choice == 'q') exit(0);
+  
+  auto end = chrono::high_resolution_clock::now();
+  double time = chrono::duration_cast<chrono::seconds>(end - start).count() ;
+  cout<<"time taken "<<time<<"sec."<<'\n';
+  
+  cout<<"press any key to terminate program\n";
+  char choice;
+  if (cin>>choice)
+  {
+    //Stopping the watch service
+    parserObj.setSignal(false) ;
+    
+    return 0;
+    
+  }
+  
+    
 }
