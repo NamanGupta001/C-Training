@@ -2,14 +2,16 @@
 #include <unordered_map>
 #include <iterator>
 #include <sys/stat.h>
-
+#include <string>
+#include <cstring>
 using namespace std;
 
+string getfilename(string filePath)
+{
+  
+}
 int main() 
 {
-  // int status = mkdir("/home/ubuntu/Downloads/naman",0777);
-  // if (status == 0) 
-  // else if (errno == EEXIST)
-  //   cout<<"dir already exists";
-    
+  
+  
 }
